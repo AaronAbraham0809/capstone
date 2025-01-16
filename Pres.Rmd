@@ -1,0 +1,49 @@
+---
+title: "Final Project"
+author: "Aaron Abraham Mathews"
+date: "2025-01-16"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Introduction
+The goal of this exercise is to create a product to highlight the prediction algorithm that you have built and to provide an interface that can be accessed by others. For this project you must submit:<br>
+
+
+## Algorithm used to make prediction
+```{r,echo=TRUE}
+predictWord <- function(the_word) {
+    word_add <- stripWhitespace(removeNumbers(removePunctuation(tolower(the_word),preserve_intra_word_dashes = TRUE)))
+    # testing print("word_add")
+    the_word <- strsplit(word_add, " ")[[1]]
+    # testing print("the_word")
+    n <- length(the_word)
+    # testing print(n)
+    
+    ########### check Bigram
+    if (n == 1) {the_word <- as.character(tail(the_word,1)); functionBigram(the_word)}
+    
+    ################ check trigram
+    else if (n == 2) {the_word <- as.character(tail(the_word,2)); functionTrigram(the_word)}
+    
+    ############### check quadgram
+    else if (n >= 3) {the_word <- as.character(tail(the_word,3)); functionQuadgram(the_word)}
+}
+```
+
+
+
+## Functioning of the App
+
+1. The first step is to load the necessary libraries, which provide the tools and functions required for processing text data and making predictions efficiently.  
+2. The app then loads the precomputed frequency matrices for bigrams, trigrams, and quadgrams. These matrices contain word pair, triplet, and quadruplet frequencies, forming the foundation of the prediction algorithm.  
+3. Using this data, the app employs a prediction function to analyze input text and predict the most likely next word. This function utilizes n-gram frequency matrices to ensure accurate predictions.  
+4. Finally, the core mechanism of the app is the `predictWord` function, which is optimized for fast and reliable word predictions, ensuring a seamless user experience.  
+
+## Experience Using the App
+
+1. The app efficiently predicts the next word by employing a well-designed prediction algorithm that leverages n-gram models. It processes the input text to deliver precise and contextually relevant results.  
+2. The results are generated using robust prediction functions, ensuring accuracy and consistency. The app is intuitive and user-friendly, offering a smooth and reliable experience.  

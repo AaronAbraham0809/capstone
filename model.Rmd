@@ -1,0 +1,195 @@
+---
+title: "Model"
+author: "Aaron Abraham Mathews"
+date: "2025-01-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+  library(quanteda)
+  require(readtext)
+  library(sqldf)
+  library(dplyr)
+  library(stringi)
+ library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+
+The goal of the project is to build a predictive model for suggesting next word given a text input.
+In this report we will summarise data exploration for next word prediction model. 
+
+
+
+```{r warning=FALSE}
+    conn <- file("C:/Users/aaron/Downloads/Coursera-SwiftKey/final/en_US/en_US.twitter.txt", "r")
+    twitterText <- readLines(conn, encoding = "UTF-8", skipNul = TRUE)
+    close(conn) 
+    conn <- file("C:/Users/aaron/Downloads/Coursera-SwiftKey/final/en_US/en_US.news.txt", "r")
+    newsText <- readLines(conn, encoding = "UTF-8", skipNul = TRUE)
+    close(conn) 
+    conn <- file("C:/Users/aaron/Downloads/Coursera-SwiftKey/final/en_US/en_US.blogs.txt", "r")
+    blogsText <- readLines(conn, encoding = "UTF-8", skipNul = TRUE)
+    close(conn) 
+  
+```
+
+
+Lets check the number of lines, words and size of all three texts: 
+
+```{r}
+sizeTwitter <- file.info("en_US.twitter.txt")$size / 1024
+sizeNews <- file.info("en_US.news.txt")$size / 1024
+sizeblogs <- file.info("en_US.blogs.txt")$size / 1024
+wordsTwitter <- stri_count_words(twitterText)
+wordsNews <- stri_count_words(newsText)
+wordsbolg <- stri_count_words(blogsText)
+data.frame(Source = c("Twitter", "News", "Blogs"),
+           SizeMB = c(sizeTwitter, sizeNews, sizeblogs),
+           NoofLines = c(length(twitterText),length(newsText), length(blogsText)),
+           NoOfWords = c(sum(wordsTwitter),sum(wordsNews),sum(wordsbolg)))
+```
+
+## Data sampling
+
+```{r}
+
+file.list <- c(
+  "C:/Users/aaron/Downloads/Coursera-SwiftKey/final/en_US/en_US.twitter.txt", 
+  "C:/Users/aaron/Downloads/Coursera-SwiftKey/final/en_US/en_US.news.txt", 
+  "C:/Users/aaron/Downloads/Coursera-SwiftKey/final/en_US/en_US.blogs.txt"
+)
+
+set.seed(1288)
+
+# Check if mergedfile.txt exists before trying to read it
+if (!file.exists("mergedfile.txt")) {
+    # File does not exist, create it by merging the input text files
+    conn <- file("mergedfile.txt", "w")  # Open in write mode
+    for (file.path in file.list) {  # Iterate over your file list
+        fileContent <- readLines(file.path, encoding = "UTF-8", skipNul = TRUE)
+        writeLines(fileContent, conn)
+    }
+    close(conn)
+    message("Merged file created successfully: mergedfile.txt")
+}
+
+# Read the merged file for sampling
+fulltext <- readLines("mergedfile.txt", encoding = "UTF-8", skipNul = TRUE)
+nlines <- length(fulltext)
+
+# Sampling lines and saving to sampledfile.txt
+if (!file.exists("sampledfile.txt")) {
+    conn <- file("sampledfile.txt", "w")
+    selection <- rbinom(nlines, 1, 0.1)  # Sample 10% of lines
+    
+    # Replace NA values in the selection vector with 0 (indicating non-selection)
+    selection[is.na(selection)] <- 0
+    
+    for (i in 1:nlines) {
+        if (selection[i] == 1) {
+            cat(fulltext[i], file = conn, sep = "\n")
+        }
+    }
+    close(conn)
+    message("Sampled file created successfully: sampledfile.txt")
+}
+
+# Read the sampled text into a corpus
+mytf3 <- readLines("sampledfile.txt", encoding = "UTF-8")
+myCorpus <- corpus(mytf3)
+
+```
+
+
+# Helper methods 
+
+
+```{r utilities}
+getProfanities <- function() {
+  profanityFile <- "profanities.txt"
+  if (!file.exists(profanityFile)) {
+    download.file('http://www.cs.cmu.edu/~biglou/resources/bad-words.txt',
+                  profanityFile)
+  }
+  profanities <-
+    read.csv("profanities.txt",
+             header = FALSE,
+             stringsAsFactors = FALSE)
+  profanities$V1
+}
+makeNgrams <- function(sentences, n = 1L) {
+  words <-
+    tokens(
+      sentences,
+      ngrams = n,
+      remove_url = TRUE,
+      remove_separators = TRUE,
+      remove_punct = TRUE,
+      remove_twitter = TRUE,
+      what = "word",
+      remove_hyphens = TRUE,
+      remove_numbers = TRUE
+    )
+  words <-  tokens_remove(words, getProfanities())
+}
+plotMostFrequentwords <- function(nGrams, title){
+    nGramList <-  unlist(nGrams, recursive = FALSE, use.names = FALSE)
+  wordFreq <- table(nGramList)
+  mostfreqTwoGrams <- as.data.frame(sort(wordFreq,decreasing=TRUE)[1:10])
+  ggplot(mostfreqTwoGrams, aes(x= nGramList,y = Freq)) +geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0))  + ggtitle(title)
+}
+```
+
+#Data cleanup
+
+Then we will create n-grams and remove the profanities using tokens_remove feature of quanteda.
+
+```{r results = 'hide'}
+# Ensure sentences is a character vector before passing to tokens()
+sentences <- as.character(mytf3)  # Convert corpus to character vector
+
+# Now proceed with tokenization
+sentences_tokens <- tokens(
+  sentences,
+  what = "sentence",
+  remove_punct = TRUE,
+  remove_twitter = TRUE
+)
+
+# Proceed with removing profanities
+sentences_tokens <- tokens_remove(sentences_tokens, getProfanities())
+
+# Convert sentences to lowercase
+sentences_tokens <- lapply(sentences_tokens, function(a) char_tolower(a))
+
+# Create n-grams
+twoGrams <- makeNgrams(sentences_tokens, 2)
+threeGrams <- makeNgrams(sentences_tokens, 3)
+FourGrams <- makeNgrams(sentences_tokens, 4)
+
+```
+
+## Exploratory analysis 
+Most frequent bigrams, trigrams and four gram words: 
+
+```{r}
+plotMostFrequentwords <- function(nGrams, title) {
+  nGramList <- unlist(nGrams, recursive = FALSE, use.names = FALSE)
+  wordFreq <- table(nGramList)
+  
+  # Sort and convert the frequency table to a data frame
+  mostfreqTwoGrams <- as.data.frame(sort(wordFreq, decreasing = TRUE)[1:10])
+  
+  # Rename the columns to 'nGramList' and 'Freq' for clarity
+  colnames(mostfreqTwoGrams) <- c("nGramList", "Freq")
+  
+  # Plot using ggplot2
+  ggplot(mostfreqTwoGrams, aes(x = nGramList, y = Freq)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
+    ggtitle(title)
+}
+```
